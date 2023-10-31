@@ -49,12 +49,6 @@ export function createCampaign(
       return Result.Err<Campaign, string>("Goal should be greater than 0");
     }
 
-    // const endDate = new Date();
-    // endDate.setDate(endDate.getDate() + _deadline);
-    //   getDate: Query([text], nat32, (isoString) => {
-    //     return new Date(isoString).getDate();
-    // }),
-
     const presentTime = Number(ic.time());
     const nanoSeconds = Number(_deadline * 86400 * 1_000_000_000);
     const endDate = presentTime + nanoSeconds;
@@ -154,9 +148,6 @@ export function donateCampaign(
   });
 }
 
-/*
-getCampaign: Gets the campaign by taking the campaignId as input,
-*/
 /**
  * Gets a campaign by its ID.
  *
@@ -198,5 +189,126 @@ export function deleteCampaign(id: string): Result<Campaign, string> {
     Some: (deletedCampaign) => Result.Ok<Campaign, string>(deletedCampaign),
     None: () =>
       Result.Err<Campaign, string>(`the campaign with id=${id} is not found`),
+  });
+}
+
+/**
+ * Adds a new donor to an existing campaign by its ID.
+ *
+ * @param _campaignId - The ID of the campaign to add a donor to.
+ * @param _donor - The donor object to add.
+ * @returns A result object containing the updated campaign or an error string.
+ */
+$update;
+export function addDonorToCampaign(
+  _campaignId: string,
+  _donor: Donor
+): Result<Campaign, string> {
+  return match(campaignStorage.get(_campaignId), {
+    Some: (campaign) => {
+      campaign.donors.push(_donor);
+      campaignStorage.insert(_campaignId, campaign);
+      return Result.Ok<Campaign, string>(campaign);
+    },
+    None: () =>
+      Result.Err<Campaign, string>(
+        `the campaign with id=${_campaignId} is not found`
+      ),
+  });
+}
+
+/**
+ * Retrieves the list of all campaigns.
+ *
+ * @returns A result object containing a list of all campaigns or an error string.
+ */
+$query;
+export function getAllCampaigns(): Result<Vec<Campaign>, string> {
+  const campaigns: Vec<Campaign> = [];
+  for (const [id, campaign] of campaignStorage.entries()) {
+    campaigns.push(campaign);
+  }
+  return Result.Ok<Vec<Campaign>, string>(campaigns);
+}
+
+/**
+ * Checks if a campaign has reached its donation goal.
+ *
+ * @param _campaignId - The ID of the campaign to check.
+ * @returns A result object indicating whether the campaign has reached its goal or an error string.
+ */
+$query;
+export function hasCampaignReachedGoal(_campaignId: string): Result<boolean, string> {
+  return match(campaignStorage.get(_campaignId), {
+    Some: (campaign) => {
+      return Result.Ok<boolean, string>(campaign.totalDonations >= campaign.goal);
+    },
+    None: () =>
+      Result.Err<boolean, string>(
+        `the campaign with id=${_campaignId} is not found`
+      ),
+  });
+}
+
+/**
+ * Retrieves the list of donors for a specific campaign.
+ *
+ * @param _campaignId - The ID of the campaign to get donors for.
+ * @returns A result object containing the list of donors or an error string.
+ */
+$query;
+export function getDonorsForCampaign(_campaignId: string): Result<Vec<Donor>, string> {
+  return match(campaignStorage.get(_campaignId), {
+    Some: (campaign) => {
+      return Result.Ok<Vec<Donor>, string>(campaign.donors);
+    },
+    None: () =>
+      Result.Err<Vec<Donor>, string>(
+        `the campaign with id=${_campaignId} is not found`
+      ),
+  });
+}
+
+/**
+ * Updates the deadline of a campaign by its ID.
+ *
+ * @param _campaignId - The ID of the campaign to update the deadline for.
+ * @param _newDeadline - The new deadline in days.
+ * @returns A result object containing the updated campaign or an error string.
+ */
+$update;
+export function updateCampaignDeadline(_campaignId: string, _newDeadline: number): Result<Campaign, string> {
+  return match(campaignStorage.get(_campaignId), {
+    Some: (campaign) => {
+      const presentTime = Number(ic.time());
+      const nanoSeconds = Number(_newDeadline * 86400 * 1_000_000_000);
+      const newDeadline = presentTime + nanoSeconds;
+      campaign.deadline = newDeadline;
+      campaignStorage.insert(_campaignId, campaign);
+      return Result.Ok<Campaign, string>(campaign);
+    },
+    None: () =>
+      Result.Err<Campaign, string>(
+        `the campaign with id=${_campaignId} is not found`
+      ),
+  });
+}
+
+/**
+ * Checks if a campaign has ended based on its current status.
+ *
+ * @param _campaignId - The ID of the campaign to check.
+ * @returns A result object indicating whether the campaign has ended or an error string.
+ */
+$query;
+export function hasCampaignEnded(_campaignId: string): Result<boolean, string> {
+  return match(campaignStorage.get(_campaignId), {
+    Some: (campaign) => {
+      return Result.Ok<boolean, string>(Number(ic.time()) > Number(campaign.deadline));
+    },
+    None: () =>
+      Result.Err<boolean, string>(
+        `the campaign with id=${_campaignId} is not found`
+      ),
   });
 }
